@@ -67,6 +67,25 @@ class Sonic:
     def sensors(self, act):
         if self.mode == air:pass # TODO
         elif self.mode == floor:
+            y = self.ypos // 256
+            x = self.xpos // 256
+            if self.xsp > 0:
+                if act.solid(x + self.push_width, y):
+                    offset = 0
+                    while offset < 16:
+                        if not act.solid(x + self.push_width - offset, y):break
+                        offset += 1
+                    self.xpos = (self.xpos // 256 - offset) * 256
+                    self.gsp = 0
+            elif self.xsp < 0:
+                if act.solid(x - self.push_width, y):
+                    offset = 0
+                    while offset < 16:
+                        if not act.solid(x - self.push_width + offset, y):break
+                        offset += 1
+                    self.xpos = (self.xpos // 256 + offset) * 256
+                    self.gsp = 0
+
             points = []
             y = self.ypos // 256 + self.body_height
             for x in (self.xpos // 256 - self.body_width, self.xpos // 256 + self.body_width):
@@ -81,8 +100,15 @@ class Sonic:
                         if act.solid(x, y+offset):break
                         offset += 1
                     offset -= 1
-                points.append(offset)
-            self.ypos = (self.ypos // 256 + min(points)) * 256
+                points.append((offset, act.tiles[y//16][x//16].angle))
+            if points[0][0] < points[1][0]:
+                offset = points[0][0]
+                self.angle = points[0][1]
+            else:
+                offset = points[1][0]
+                self.angle = points[1][1]
+            self.ypos = (self.ypos // 256 + offset) * 256
+            
     def move(self, keys):
         if self.mode == air:pass
         elif self.mode == floor:
@@ -93,16 +119,19 @@ class Sonic:
                 right = False
             if self.gsp > 0:
                 if right:
-                    self.gsp += self.acc
-                    if self.gsp > self.top:self.gsp = self.top
+                    if self.gsp < self.top:
+                        self.gsp += self.acc
+                        if self.gsp > self.top:self.gsp = self.top
                 elif left:self.gsp -= self.dec
                 else:self.gsp -= self.frc
             else:
                 if left:
-                    self.gsp -= self.acc
-                    if self.gsp < -self.top:self.gsp = -self.top
+                    if self.gsp > -self.top:
+                        self.gsp -= self.acc
+                        if self.gsp < -self.top:self.gsp = -self.top
                 elif right:self.gsp += self.dec
                 else:self.gsp += self.frc
+                
             self.xsp = int(self.gsp * cos(radians(self.ang)))
             self.ysp = int(self.gsp * sin(radians(self.ang)))
 
@@ -146,9 +175,11 @@ class Act:
         
 pygame.init()
 
-screenX = 128
-screenY = 128
-screen = pygame.display.set_mode((screenX, screenY))
+screenX = 256
+screenY = 256
+screen = pygame.Surface((screenX, screenY))
+
+window = pygame.display.set_mode((screenX * 2, screenY * 2))
 
 clock = pygame.time.Clock()
 
@@ -158,14 +189,16 @@ player = Sonic()
 
 while True:
     for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            exit()
+        if event.type == pygame.QUIT:exit()
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:exit()
     keys = pygame.key.get_pressed()
     screen.fill((0, 0, 0))
     act.draw(screen)
     player.draw(screen)
     player.move(keys)
     player.sensors(act)
+    pygame.transform.scale(screen, (screenX * 2, screenY * 2), window)
     pygame.display.flip()
     clock.tick(60)
     
