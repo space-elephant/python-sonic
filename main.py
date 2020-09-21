@@ -1,12 +1,26 @@
 #!/usr/bin/env python3
 import pygame
-
+import sys
+import json
 
 def display_angle(hex_angle):return (256-hex_angle)*1.40625
 def full_size(radius):return radius * 2 - 1
 
-class player:
+# animations
+roll = 0
+stand = 1
+
+# modes
+air = 0
+floor = 1
+left = 2
+top = 3
+right = 4
+
+class Sonic:
     def __init__(self):
+        self.animation = stand
+        self.mode = floor
         self.acc = 0xC # acceleration
         self.dec = 0x80 # deceleration
         self.frc = 0xC # friction
@@ -21,8 +35,8 @@ class player:
         # self.jmp = 0x600 # for knuckles
         self.grv = 0x38 # gravity
         
-        self.xpos = 0x800 # 8 pixels
-        self.ypos = 0x1200
+        self.xpos = 0x1300 # 0x13 pixels
+        self.ypos = 0x1A00
         self.body_width = 0x9 # for ground collision. Collision uses full pixels
         self.body_height = 0x13
         self.push_width = 0xA # for pushing things
@@ -30,38 +44,99 @@ class player:
         self.xsp = 0 # x speed
         self.ysp = 0 # y speed
         self.gsp = 0 # ground speed
-        self.slope = slp # current slope factor
-        self.ang = 0 # one byte angle. 0x00 right, 0x40 up, 0x80 left, 0xC0 down. 
-    def sensors(self, tiles):
-        a = self.xpos // 0x100 - self.body_width
-        b = self.xpos // 0x100 - self.body_width
-        height = self.ypos // 0x100 + self.body_height
-        a_tile = a // 16
-        a_pixel = a % 16
-        b_tile = b // 16
-        b_pixel = b % 16
-        height_tile = height // 16
-        height_pixel = height % 16
-        a_height = tiles[a_tile][height_tile].heights[a_pixel]
-        if a_height == 0:a_height = tiles[a_tile][height_tile+1].heights[a_pixel]-16
-        if a_height == 16:a_height = tiles[a_tile][height_tile-1].heights[a_pixel]+16
-        b_height = tiles[b_tile][height_tile].heights[b_pixel]
-        if b_height == 0:b_height = tiles[b_tile][height_tile+1].heights[b_pixel]-16
-        if b_height == 16:b_height = tiles[b_tile][height_tile-1].heights[b_pixel]+16
+        self.slope = self.slp # current slope factor
+        self.ang = 0 # one byte angle. 0x00 right, 0x40 up, 0x80 left, 0xC0 down.
 
-class tile:
-    def __init__(self, heights, angle):
-        self.heights = heights
-        self.angle = angle
-solid = [16] * 16
-empty = [0] * 16
+        self.image = pygame.image.load('graphics/character/sonic/idle/1.png')
+    def draw(self, screen):
+        error = (255, 255, 255)
+        width, height = self.image.get_size()
+        x = self.xpos // 256
+        y = self.ypos // 256
+        screen.blit(self.image, (x - width // 2, y - height // 2))
+        pygame.draw.line(screen, error, (x - self.push_width, y), (x + self.push_width, y))
+        pygame.draw.line(screen, error,
+                         (x - self.body_width, y - self.body_height),
+                         (x - self.body_width, y + self.body_height))
+        pygame.draw.line(screen, error,
+                         (x + self.body_width, y - self.body_height),
+                         (x + self.body_width, y + self.body_height))
+    def sensors(self, act):
+        if self.mode == air:pass # TODO
+        elif self.mode == floor:
+            points = []
+            y = self.ypos // 256 + self.body_height
+            for x in (self.xpos // 256 - self.body_width, self.xpos // 256 + self.body_width):
+                if act.solid(x, y):
+                    offset = -1
+                    while offset > -16:
+                        if not act.solid(x, y+offset):break
+                        offset -= 1
+                else:
+                    offset = 1
+                    while offset < 16:
+                        if act.solid(x, y+offset):break
+                        offset += 1
+                    offset -= 1
+                points.append(offset)
+            self.ypos = (self.ypos // 256 + min(points)) * 256
+                    
+
+
+class Tile:
+    def __init__(self, tileset, number):
+            self.image = pygame.image.load('graphics/tileset/{}/{}.png'.format(tileset, number))
+            with open('graphics/tileset/{}/{}.json'.format(tileset, number)) as f:data = json.load(f)
+            self.map = data[:-1]
+            self.angle = data[-1]
+
+class Act:
+    def __init__(self, json):
+        self.name = json['name']
+        self.number = json['number']
+        alltiles = json['tileset']
+        self.tiles = json['tiles']
+        tileset = {}
+        for row in range(len(self.tiles)):
+            for point in range(len(self.tiles[row])):
+                if not self.tiles[row][point] in tileset:
+                    tileset[self.tiles[row][point]] = Tile(alltiles, self.tiles[row][point])
+                self.tiles[row][point] = tileset[self.tiles[row][point]]
+    def draw(self, screen): # static camera
+        for row in range(len(self.tiles)):
+            for tile in range(len(self.tiles[row])):
+                screen.blit(self.tiles[row][tile].image, (tile*16, row*16))
+    def solid(self, x, y):
+        xtile = x // 16
+        xpixel = x % 16
+        ytile = y // 16
+        ypixel = y % 16
+        return self.tiles[ytile][xtile].map[ypixel][xpixel]
+
         
-tiles = [
-    [tile(empty, 0), tile([4]* 16, 0), tile(solid, 0)],
-    [tile(empty, 0), tile([4]* 16, 0), tile(solid, 0)],    
-]
-
 pygame.init()
-screenX = 320
-screenY = 224
+
+screenX = 128
+screenY = 128
 screen = pygame.display.set_mode((screenX, screenY))
+
+clock = pygame.time.Clock()
+
+with open('test levels/zone/1.json') as f:act = Act(json.load(f))
+
+player = Sonic()
+
+while True:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            exit()
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_LEFT]:player.xpos -= 256
+    if keys[pygame.K_RIGHT]:player.xpos += 256
+    screen.fill((0, 0, 0))
+    act.draw(screen)
+    player.draw(screen)
+    player.sensors(act)
+    pygame.display.flip()
+    clock.tick(60)
+    
