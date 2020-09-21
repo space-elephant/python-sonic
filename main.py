@@ -2,8 +2,11 @@
 import pygame
 import sys
 import json
+from math import sin, cos, tan, pi
 
-def display_angle(hex_angle):return (256-hex_angle)*1.40625
+def radians(hex_angle):return hex_angle / 128 * pi
+
+def display_angle(hex_angle):return hex_angle*1.40625
 def full_size(radius):return radius * 2 - 1
 
 # animations
@@ -80,7 +83,34 @@ class Sonic:
                     offset -= 1
                 points.append(offset)
             self.ypos = (self.ypos // 256 + min(points)) * 256
-                    
+    def move(self, keys):
+        if self.mode == air:pass
+        elif self.mode == floor:
+            left = keys[pygame.K_LEFT]
+            right = keys[pygame.K_RIGHT]
+            if left and right:
+                left = False
+                right = False
+            if self.gsp > 0:
+                if right:
+                    self.gsp += self.acc
+                    if self.gsp > self.top:self.gsp = self.top
+                elif left:self.gsp -= self.dec
+                else:self.gsp -= self.frc
+            else:
+                if left:
+                    self.gsp -= self.acc
+                    if self.gsp < -self.top:self.gsp = -self.top
+                elif right:self.gsp += self.dec
+                else:self.gsp += self.frc
+            self.xsp = int(self.gsp * cos(radians(self.ang)))
+            self.ysp = int(self.gsp * sin(radians(self.ang)))
+
+            self.xpos += self.xsp
+            self.ypos += self.ysp
+            
+
+                
 
 
 class Tile:
@@ -131,11 +161,10 @@ while True:
         if event.type == pygame.QUIT:
             exit()
     keys = pygame.key.get_pressed()
-    if keys[pygame.K_LEFT]:player.xpos -= 256
-    if keys[pygame.K_RIGHT]:player.xpos += 256
     screen.fill((0, 0, 0))
     act.draw(screen)
     player.draw(screen)
+    player.move(keys)
     player.sensors(act)
     pygame.display.flip()
     clock.tick(60)
