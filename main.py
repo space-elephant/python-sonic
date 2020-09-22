@@ -52,12 +52,13 @@ class Sonic:
 
         self.image = pygame.image.load('graphics/character/sonic/idle/1.png')
     def draw(self, screen):
-        error = (255, 255, 255)
+        error = (255, 0, 255)
         width, height = self.image.get_size()
         x = self.xpos // 256
         y = self.ypos // 256
         screen.blit(self.image, (x - width // 2, y - height // 2))
-        pygame.draw.line(screen, error, (x - self.push_width, y), (x + self.push_width, y))
+        offset = 8 if self.ang == 0 else 0 
+        pygame.draw.line(screen, error, (x - self.push_width, y + offset), (x + self.push_width, y + offset))
         pygame.draw.line(screen, error,
                          (x - self.body_width, y - self.body_height),
                          (x - self.body_width, y + self.body_height))
@@ -69,6 +70,7 @@ class Sonic:
         elif self.mode == floor:
             y = self.ypos // 256
             x = self.xpos // 256
+            if self.ang == 0:y += 8
             if self.xsp > 0:
                 if act.solid(x + self.push_width, y):
                     offset = 0
@@ -100,13 +102,14 @@ class Sonic:
                         if act.solid(x, y+offset):break
                         offset += 1
                     offset -= 1
-                points.append((offset, act.tiles[y//16][x//16].angle))
+                points.append((offset, act.tiles[(y+offset+1)//16][x//16].angle))
+            print(points)
             if points[0][0] < points[1][0]:
                 offset = points[0][0]
-                self.angle = points[0][1]
+                self.ang = points[0][1]
             else:
                 offset = points[1][0]
-                self.angle = points[1][1]
+                self.ang = points[1][1]
             self.ypos = (self.ypos // 256 + offset) * 256
             
     def move(self, keys):
@@ -123,14 +126,21 @@ class Sonic:
                         self.gsp += self.acc
                         if self.gsp > self.top:self.gsp = self.top
                 elif left:self.gsp -= self.dec
-                else:self.gsp -= self.frc
-            else:
+                else:
+                    self.gsp -= self.frc
+                    if self.gsp < 0:self.gsp = 0
+            elif self.gsp < 0:
                 if left:
                     if self.gsp > -self.top:
                         self.gsp -= self.acc
                         if self.gsp < -self.top:self.gsp = -self.top
                 elif right:self.gsp += self.dec
-                else:self.gsp += self.frc
+                else:
+                    self.gsp += self.frc
+                    if self.gsp > 0:self.gsp = 0
+            else:
+                if right:self.gsp = self.acc
+                elif left:self.gsp = -self.acc
                 
             self.xsp = int(self.gsp * cos(radians(self.ang)))
             self.ysp = int(self.gsp * sin(radians(self.ang)))
@@ -175,11 +185,16 @@ class Act:
         
 pygame.init()
 
-screenX = 256
-screenY = 256
-screen = pygame.Surface((screenX, screenY))
+screenX = 316
+screenY = 224
 
-window = pygame.display.set_mode((screenX * 2, screenY * 2))
+scale = int(sys.argv[1]) if len(sys.argv) > 1 else 1
+
+if scale == 1:
+    screen = pygame.display.set_mode((screenX, screenY))
+else:
+    screen = pygame.Surface((screenX, screenY))
+    window = pygame.display.set_mode((screenX * scale, screenY * scale))
 
 clock = pygame.time.Clock()
 
@@ -198,7 +213,7 @@ while True:
     player.draw(screen)
     player.move(keys)
     player.sensors(act)
-    pygame.transform.scale(screen, (screenX * 2, screenY * 2), window)
+    if scale != 1:pygame.transform.scale(screen, (screenX * scale, screenY * scale), window)
     pygame.display.flip()
     clock.tick(60)
     
