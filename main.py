@@ -17,9 +17,17 @@ stand = 1
 air = 0
 floor = 1
 left = 2
-top = 3
+top = 3 
 right = 4
 
+def swap(list, i1, i2):
+    circle = list[i1]
+    list[i1] = list[i2]
+    list[i2] = circle
+
+def reverse(list):
+    for i in range(len(list) // 2):
+        swap(list, i, len(list) - 1 - i)
 class Sonic:
     def __init__(self):
         self.animation = stand
@@ -49,6 +57,7 @@ class Sonic:
         self.gsp = 0 # ground speed
         self.slope = self.slp # current slope factor
         self.ang = 0 # one byte angle. 0x00 right, 0x40 up, 0x80 left, 0xC0 down.
+        self.left = False
 
         self.image = pygame.image.load('graphics/character/sonic/idle/1.png')
     def draw(self, screen):
@@ -56,8 +65,11 @@ class Sonic:
         width, height = self.image.get_size()
         x = self.xpos // 256
         y = self.ypos // 256
-        screen.blit(self.image, (x - width // 2, y - height // 2))
-        offset = 8 if self.ang == 0 else 0 
+        if self.xsp < 0:self.left = True
+        elif self.xsp > 0:self.left = False
+        image = pygame.transform.flip(self.image, True, False) if self.left else self.image
+        screen.blit(image, (x - width // 2, y - height // 2))
+        offset = 8 if self.ang == -1 else 0 
         pygame.draw.line(screen, error, (x - self.push_width, y + offset), (x + self.push_width, y + offset))
         pygame.draw.line(screen, error,
                          (x - self.body_width, y - self.body_height),
@@ -70,7 +82,7 @@ class Sonic:
         elif self.mode == floor:
             y = self.ypos // 256
             x = self.xpos // 256
-            if self.ang == 0:y += 8
+            if self.ang == -1:y += 8
             if self.xsp > 0:
                 if act.solid(x + self.push_width, y):
                     offset = 0
@@ -103,7 +115,6 @@ class Sonic:
                         offset += 1
                     offset -= 1
                 points.append((offset, act.tiles[(y+offset+1)//16][x//16].angle))
-            print(points)
             if points[0][0] < points[1][0]:
                 offset = points[0][0]
                 self.ang = points[0][1]
@@ -120,6 +131,7 @@ class Sonic:
             if left and right:
                 left = False
                 right = False
+            if self.ang != -1:self.gsp += sin(radians(self.ang))
             if self.gsp > 0:
                 if right:
                     if self.gsp < self.top:
@@ -154,10 +166,14 @@ class Sonic:
 
 class Tile:
     def __init__(self, tileset, number):
-            self.image = pygame.image.load('graphics/tileset/{}/{}.png'.format(tileset, number))
-            with open('graphics/tileset/{}/{}.json'.format(tileset, number)) as f:data = json.load(f)
+            self.image = pygame.transform.flip(pygame.image.load('graphics/tileset/{}/{}.png'.format(tileset, number[0])), number[1], number[2])
+            with open('graphics/tileset/{}/{}.json'.format(tileset, number[0])) as f:data = json.load(f)
             self.map = data[:-1]
             self.angle = data[-1]
+            
+            if number[1]:
+                for line in self.map:reverse(line)
+            if number[2]:reverse(self.map)
 
 class Act:
     def __init__(self, json):
@@ -168,9 +184,9 @@ class Act:
         tileset = {}
         for row in range(len(self.tiles)):
             for point in range(len(self.tiles[row])):
-                if not self.tiles[row][point] in tileset:
-                    tileset[self.tiles[row][point]] = Tile(alltiles, self.tiles[row][point])
-                self.tiles[row][point] = tileset[self.tiles[row][point]]
+                if not tuple(self.tiles[row][point]) in tileset:
+                    tileset[tuple(self.tiles[row][point])] = Tile(alltiles, self.tiles[row][point])
+                self.tiles[row][point] = tileset[tuple(self.tiles[row][point])]
     def draw(self, screen): # static camera
         for row in range(len(self.tiles)):
             for tile in range(len(self.tiles[row])):
