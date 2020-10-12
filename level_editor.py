@@ -2,6 +2,11 @@
 import pygame
 import json
 import os
+import sys
+
+pygame.init()
+
+font = pygame.font.SysFont('monospace', 12, True, False)
 
 def colour(collision):
     if collision == 0:return (0, 0, 0)
@@ -10,22 +15,27 @@ def colour(collision):
     elif collision == 3:return (255, 255, 255)
 
 class tile:
-    def __init__(self, tileset, number):
-        self.image = pygame.image.load('graphics/tileset/{}/{}.png'.format(tileset, number))
+    def __init__(self, tileset, number, hflip, vflip):
+        self.hflip = hflip
+        self.vflip = vflip
+        self.image = pygame.transform.flip(pygame.image.load('graphics/tileset/{}/{}.png'.format(tileset, number)), hflip, vflip)
         with open('graphics/tileset/{}/{}.json'.format(tileset, number)) as f:tree = json.load(f)
         self.solidity = tree[:-1]
         self.angle = tree[-1]
         self.mask = pygame.Surface((16, 16))
-        self.mask.set_alpha(128)
+        self.mask.set_alpha(160)
         self.mask.set_colorkey((0, 0, 0))
         pixels = pygame.PixelArray(self.mask)
         for x in range(16):
             for y in range(16):
-                pixels[x, y] = colour(self.solidity[y][x])
+                pixelx = 15 - x if hflip else x
+                pixely = 15 - y if vflip else y
+                pixels[pixelx, pixely] = colour(self.solidity[y][x])
         pixels.close()
         self.display = self.image.copy()
         self.display.blit(self.mask,(0, 0))
         self.mask.set_alpha(255)
+        self.number = number
     def visible(self):
         if showsolid:
             if showtile:return self.display
@@ -39,7 +49,8 @@ class act:
         self.data = tree['tiles']
         for line in self.data:
             for index in range(len(line)):
-                line[index] = tile(tree['tileset'], line[index])
+                if isinstance(line[index], int):line[index] = tile(tree['tileset'], line[index], False, False)
+                else:line[index] = tile(tree['tileset'], line[index][0], line[index][1], line[index][2])
     def draw(self, screen, offset = 0):
         for y in range(len(self.data)):
             for x in range(len(self.data[y])):
@@ -52,19 +63,22 @@ class tileset(act):
         self.data = []
         for i in range(length):
             if i % 16 == 0:self.data.append([])
-            self.data[-1].append(tile(name, i))
+            self.data[-1].append(tile(name, i, False, False))
     def draw(self, screen, offset = 0):
-        difference = 19
         for y in range(len(self.data)):
             for x in range(len(self.data[y])):
-                screen.blit(self.data[y][x].visible(), (x * difference, y * difference - offset * difference))
+                screen.blit(self.data[y][x].visible(), (x * tileset.difference, y * tileset.difference - offset * tileset.difference))
 
+tileset.difference = 19
 
-pygame.init()
-
-screenX = 316
+screenX = 320
 screenY = 224
-screen = pygame.display.set_mode((screenX, screenY))
+
+scale = int(sys.argv[1]) if len(sys.argv) > 1 else 1
+if scale == 1:screen = pygame.display.set_mode((screenX, screenY))
+else:
+    screen = pygame.Surface((screenX, screenY))
+    window = pygame.display.set_mode((screenX * scale, screenY * scale))
 
 clock = pygame.time.Clock()
 
@@ -76,8 +90,15 @@ tiles = tileset(tree['tileset'])
 tilemode = False
 showsolid = True
 showtile = True
+drawmode = False
 
 offset = 0
+
+pointer = 0
+hflip = False
+vflip = False
+
+pos = (0, 0)
 
 while True:
     for event in pygame.event.get():
@@ -86,16 +107,43 @@ while True:
             if event.key == pygame.K_ESCAPE:tilemode = not tilemode
             elif event.key == pygame.K_x:showsolid = not showsolid
             elif event.key == pygame.K_z:showtile = not showtile
+            elif event.key == pygame.K_d:hflip = not hflip
+            elif event.key == pygame.K_c:vflip = not vflip
             elif event.key == pygame.K_DOWN:
                 if tilemode:offset += 1
                 #else: # TODO add scrolling
             elif event.key == pygame.K_UP:
                 if tilemode:offset -= 1
-                elif event.key == pygame.K_q:exit()
-        screen.fill((0, 0, 0))
+            elif event.key == pygame.K_q:exit()
+            elif event.key == pygame.K_s:
+                tree['tiles'] = []
+                for line in level.data:
+                    tree['tiles'].append([])
+                    for point in line:
+                        tree['tiles'][-1].append([point.number, point.hflip, point.vflip])
+                with open('test levels/zone/1.json', 'w') as f:json.dump(tree,f)
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            drawmode = True
+            if not tilemode:
+                level.data[event.pos[1] // (scale * 16)][event.pos[0] // (scale * 16)] = tile(tree['tileset'], pointer, hflip, vflip)
+        elif event.type == pygame.MOUSEBUTTONUP:
+            drawmode = False
+            if tilemode:
+                pointer = tiles.data[event.pos[1] // (scale * tileset.difference)][event.pos[0] // (scale * tileset.difference)].number
+                tilemode = False
+                hflip = False
+                vflip = False
+        elif event.type == pygame.MOUSEMOTION:
+            pos = event.pos
+            if drawmode and not tilemode:level.data[event.pos[1] // (scale * 16)][event.pos[0] // (scale * 16)] = tile(tree['tileset'], pointer, hflip, vflip)
+    screen.fill((0, 0, 0))
 
-        if tilemode:tiles.draw(screen, offset)
-        else:level.draw(screen)
+    if tilemode:
+        tiles.draw(screen, offset)
+        screen.blit(font.render(hex(pos[0] // (scale * tileset.difference) + pos[1] // (scale * tileset.difference) * 16)[2:], True, (255, 0, 0)), (pos[0], pos[1] + 10))
+    else:level.draw(screen)
 
-        pygame.display.flip()
-        clock.tick(60)
+    if scale != 1:pygame.transform.scale(screen, (screenX * scale, screenY * scale), window)
+        
+    pygame.display.flip()
+    clock.tick(60)
