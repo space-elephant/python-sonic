@@ -84,9 +84,9 @@ class Sonic:
     def sensors(self, act):
         print(self.mode, self.ang)
         if self.ang < 45:self.mode = floor
-        elif self.ang < 135:self.mode = left
+        elif self.ang < 135:self.mode = right
         elif self.ang < 225:self.mode = top
-        elif self.ang < 315:self.mode = right
+        elif self.ang < 315:self.mode = left
         else:self.mode = floor
         if self.mode == air:pass # TODO
         elif self.mode == floor:
