@@ -68,6 +68,10 @@ class Sonic:
         if self.xsp < 0:self.left = True
         elif self.xsp > 0:self.left = False
         image = pygame.transform.flip(self.image, True, False) if self.left else self.image
+        if self.mode == left:image = pygame.transform.rotate(image, 270)
+        elif self.mode == top:image = pygame.transform.rotate(image, 180)
+        elif self.mode == right:image = pygame.transform.rotate(image, 90)
+        
         screen.blit(image, (x - width // 2, y - height // 2))
         offset = 8 if self.ang == -1 else 0 
         pygame.draw.line(screen, error, (x - self.push_width, y + offset), (x + self.push_width, y + offset))
@@ -78,6 +82,12 @@ class Sonic:
                          (x + self.body_width, y - self.body_height),
                          (x + self.body_width, y + self.body_height))
     def sensors(self, act):
+        print(self.mode, self.ang)
+        if self.ang < 45:self.mode = floor
+        elif self.ang < 135:self.mode = left
+        elif self.ang < 225:self.mode = top
+        elif self.ang < 315:self.mode = right
+        else:self.mode = floor
         if self.mode == air:pass # TODO
         elif self.mode == floor:
             y = self.ypos // 256
@@ -123,6 +133,142 @@ class Sonic:
                 self.ang = points[1][1]
             self.ypos = (self.ypos // 256 + offset) * 256
             
+        elif self.mode == left:
+            y = self.ypos // 256
+            x = self.xpos // 256
+            if abs(self.gsp) < self.fall:self.mode = floor
+            if self.ysp > 0:
+                if act.solid(x, y + self.push_width):
+                    offset = 0
+                    while offset < 16:
+                        if not act.solid(x, y + self.push_width - offset):break
+                        offset += 1
+                    self.ypos = (self.ypos // 256 - offset) * 256
+                    self.gsp = 0
+                    self.mode = floor
+            elif self.ysp < 0:
+                if act.solid(x, y - self.push_width, ):
+                    offset = 0
+                    while offset < 16:
+                        if not act.solid(x, y - self.push_width + offset):break
+                        offset += 1
+                    self.ypos = (self.ypos // 256 + offset) * 256
+                    self.gsp = 0
+                    self.mode = floor
+
+            points = []
+            x = self.xpos // 256 - self.body_height
+            for y in (self.ypos // 256 - self.body_width, self.ypos // 256 + self.body_width):
+                if act.solid(x, y):
+                    offset = -1
+                    while offset > -16:
+                        if not act.solid(x-offset, y):break
+                        offset -= 1
+                else:
+                    offset = 1
+                    while offset < 16:
+                        if act.solid(x-offset ,y):break
+                        offset += 1
+                    offset -= 1
+                points.append((offset, act.tiles[y//16][(x-offset-1)//16].angle))
+            if points[0][0] < points[1][0]:
+                offset = points[0][0]
+                self.ang = points[0][1]
+            else:
+                offset = points[1][0]
+                self.ang = points[1][1]
+            self.xpos = (self.xpos // 256 - offset) * 256
+            
+        elif self.mode == top:
+            y = self.ypos // 256
+            x = self.xpos // 256
+            if self.xsp > 0:
+                if act.solid(x + self.push_width, y):
+                    offset = 0
+                    while offset < 16:
+                        if not act.solid(x + self.push_width - offset, y):break
+                        offset += 1
+                    self.xpos = (self.xpos // 256 - offset) * 256
+                    self.gsp = 0
+            elif self.xsp < 0:
+                if act.solid(x - self.push_width, y):
+                    offset = 0
+                    while offset < 16:
+                        if not act.solid(x - self.push_width + offset, y):break
+                        offset += 1
+                    self.xpos = (self.xpos // 256 + offset) * 256
+                    self.gsp = 0
+
+            points = []
+            y = self.ypos // 256 - self.body_height
+            for x in (self.xpos // 256 - self.body_width, self.xpos // 256 + self.body_width):
+                if act.solid(x, y):
+                    offset = -1
+                    while offset > -16:
+                        if not act.solid(x, y-offset):break
+                        offset -= 1
+                else:
+                    offset = 1
+                    while offset < 16:
+                        if act.solid(x, y-offset):break
+                        offset += 1
+                    offset -= 1
+                points.append((offset, act.tiles[(y-offset-1)//16][x//16].angle))
+            if points[0][0] < points[1][0]:
+                offset = points[0][0]
+                self.ang = points[0][1]
+            else:
+                offset = points[1][0]
+                self.ang = points[1][1]
+            self.ypos = (self.ypos // 256 - offset) * 256
+
+        elif self.mode == right:
+            y = self.ypos // 256
+            x = self.xpos // 256
+            if abs(self.gsp) < self.fall:self.mode = floor
+            if self.ysp > 0:
+                if act.solid(x, y + self.push_width):
+                    offset = 0
+                    while offset < 16:
+                        if not act.solid(x, y + self.push_width - offset):break
+                        offset += 1
+                    self.ypos = (self.ypos // 256 - offset) * 256
+                    self.gsp = 0
+                    self.mode = floor
+            elif self.ysp < 0:
+                if act.solid(x, y - self.push_width, ):
+                    offset = 0
+                    while offset < 16:
+                        if not act.solid(x, y - self.push_width + offset):break
+                        offset += 1
+                    self.ypos = (self.ypos // 256 + offset) * 256
+                    self.gsp = 0
+                    self.mode = floor
+
+            points = []
+            x = self.xpos // 256 + self.body_height
+            for y in (self.ypos // 256 - self.body_width, self.ypos // 256 + self.body_width):
+                if act.solid(x, y):
+                    offset = -1
+                    while offset > -16:
+                        if not act.solid(x+offset, y):break
+                        offset -= 1
+                else:
+                    offset = 1
+                    while offset < 16:
+                        if act.solid(x+offset ,y):break
+                        offset += 1
+                    offset -= 1
+                points.append((offset, act.tiles[y//16][(x+offset+1)//16].angle))
+            if points[0][0] < points[1][0]:
+                offset = points[0][0]
+                self.ang = points[0][1]
+            else:
+                offset = points[1][0]
+                self.ang = points[1][1]
+            self.xpos = (self.xpos // 256 + offset) * 256
+            
+            
     def move(self, keys):
         if self.mode == air:pass
         elif self.mode == floor:
@@ -158,10 +304,7 @@ class Sonic:
             self.ysp = int(self.gsp * sin(radians(self.ang)))
 
             self.xpos += self.xsp
-            self.ypos += self.ysp
-            
-
-                
+            self.ypos += self.ysp   
 
 
 class Tile:
@@ -174,6 +317,10 @@ class Tile:
             if number[1]:
                 for line in self.map:reverse(line)
             if number[2]:reverse(self.map)
+
+            for line in self.map:
+                for index in range(len(line)):
+                    line[index] &= number[3]
 
 class Act:
     def __init__(self, json):
@@ -196,8 +343,9 @@ class Act:
         xpixel = x % 16
         ytile = y // 16
         ypixel = y % 16
-        return self.tiles[ytile][xtile].map[ypixel][xpixel]
-
+        return self.tiles[ytile][xtile].map[ypixel][xpixel] & collision
+    
+collision = 1
         
 pygame.init()
 
