@@ -2,6 +2,7 @@
 import pygame
 import sys
 import json
+import random
 from math import sin, cos, tan, pi
 
 def radians(hex_angle):return hex_angle / 128 * pi
@@ -61,28 +62,40 @@ class Sonic:
 
         self.image = pygame.image.load('graphics/character/sonic/idle/1.png')
     def draw(self, screen):
+        offset = 8 if self.ang == -1 else 0
         error = (255, 0, 255)
         width, height = self.image.get_size()
         x = self.xpos // 256
         y = self.ypos // 256
         if self.xsp < 0:self.left = True
         elif self.xsp > 0:self.left = False
-        image = pygame.transform.flip(self.image, True, False) if self.left else self.image
-        if self.mode == left:image = pygame.transform.rotate(image, 270)
-        elif self.mode == top:image = pygame.transform.rotate(image, 180)
-        elif self.mode == right:image = pygame.transform.rotate(image, 90)
+        image = pygame.transform.flip(self.image, True, False) if self.left else self.image        
+        if self.mode == left:
+            image = pygame.transform.rotate(image, 270)
+            push = [(x, y - self.push_width), (x, y + self.push_width)]
+            bleft = [(x - self.body_height, y - self.body_width), (x + self.body_height, y - self.body_width)]
+            bright = [(x - self.body_height, y + self.body_width), (x + self.body_height, y + self.body_width)]
+        elif self.mode == top:
+            image = pygame.transform.rotate(image, 180)
+            push = [(x - self.push_width, y), (x + self.push_width, y)]
+            bleft = [(x + self.body_width, y - self.body_height), (x + self.body_width, y + self.body_height)]
+            bright = [(x - self.body_width, y - self.body_height), (x - self.body_width, y + self.body_height)]
+        elif self.mode == right:
+            image = pygame.transform.rotate(image, 90)
+            push = [(x, y - self.push_width), (x, y + self.push_width)]
+            bleft = [(x - self.body_height, y + self.body_width), (x + self.body_height, y + self.body_width)]
+            bright = [(x - self.body_height, y - self.body_width), (x + self.body_height, y - self.body_width)]
+        else:
+            push = [(x - self.push_width, y + offset), (x + self.push_width, y + offset)]
+            bleft = [(x - self.body_width, y - self.body_height), (x - self.body_width, y + self.body_height)]
+            bright = [(x + self.body_width, y - self.body_height), (x + self.body_width, y + self.body_height)]
         
         screen.blit(image, (x - width // 2, y - height // 2))
-        offset = 8 if self.ang == -1 else 0 
-        pygame.draw.line(screen, error, (x - self.push_width, y + offset), (x + self.push_width, y + offset))
-        pygame.draw.line(screen, error,
-                         (x - self.body_width, y - self.body_height),
-                         (x - self.body_width, y + self.body_height))
-        pygame.draw.line(screen, error,
-                         (x + self.body_width, y - self.body_height),
-                         (x + self.body_width, y + self.body_height))
+        pygame.draw.line(screen, error, push[0], push[1])
+        pygame.draw.line(screen, error, bleft[0], bleft[1])
+        pygame.draw.line(screen, error, bright[0], bright[1])
+        pygame.draw.circle(screen, (random.randrange(256), random.randrange(256), random.randrange(256)), (self.xpos//256, self.ypos//256), 2)
     def sensors(self, act):
-        print(self.mode, self.ang)
         if self.ang < 45:self.mode = floor
         elif self.ang < 135:self.mode = right
         elif self.ang < 225:self.mode = top
