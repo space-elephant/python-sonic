@@ -125,6 +125,7 @@ while True:
             elif event.key == pygame.K_z:showtile = not showtile
             elif event.key == pygame.K_d:hflip = not hflip
             elif event.key == pygame.K_c:vflip = not vflip
+            elif event.key == pygame.K_p:print(pointer, hex(pointer), hflip, vflip)
             elif event.key == pygame.K_f:
                 hflip = False
                 vflip = False

@@ -5,10 +5,20 @@ import json
 import random
 from math import sin, cos, tan, pi
 
-def radians(hex_angle):return hex_angle / 128 * pi
+def radians(hex_angle):return display_angle(hex_angle) / 128 * pi
 
 def display_angle(hex_angle):return hex_angle*1.40625
+def hex_angle(degrees):return degrees * 0.71111
 def full_size(radius):return radius * 2 - 1
+def flip_angle(angle, hflip, vflip):
+    if angle == -1:
+        if vflip:return 128
+        else:return -1
+    if hflip:
+        angle = (256 - angle) % 256
+    if vflip:
+        angle = (128 - angle) % 256
+    return angle
 
 # animations
 roll = 0
@@ -69,7 +79,8 @@ class Sonic:
         y = self.ypos // 256
         if self.xsp < 0:self.left = True
         elif self.xsp > 0:self.left = False
-        image = pygame.transform.flip(self.image, True, False) if self.left else self.image        
+        image = pygame.transform.flip(self.image, True, False) if self.left else self.image
+        #print(self.mode)
         if self.mode == left:
             image = pygame.transform.rotate(image, 270)
             push = [(x, y - self.push_width), (x, y + self.push_width)]
@@ -96,11 +107,12 @@ class Sonic:
         pygame.draw.line(screen, error, bright[0], bright[1])
         pygame.draw.circle(screen, (random.randrange(256), random.randrange(256), random.randrange(256)), (self.xpos//256, self.ypos//256), 2)
     def sensors(self, act):
-        if self.ang < 45:self.mode = floor
-        elif self.ang < 135:self.mode = right
-        elif self.ang < 225:self.mode = top
-        elif self.ang < 315:self.mode = left
+        if self.ang < 32:self.mode = floor
+        elif self.ang < 96:self.mode = right
+        elif self.ang < 160:self.mode = top
+        elif self.ang < 224:self.mode = left
         else:self.mode = floor
+        #print(self.ang, self.mode)
         if self.mode == air:pass # TODO
         elif self.mode == floor:
             y = self.ypos // 256
@@ -325,7 +337,7 @@ class Tile:
             self.image = pygame.transform.flip(pygame.image.load('graphics/tileset/{}/{}.png'.format(tileset, number[0])), number[1], number[2])
             with open('graphics/tileset/{}/{}.json'.format(tileset, number[0])) as f:data = json.load(f)
             self.map = data[:-1]
-            self.angle = data[-1]
+            self.angle = flip_angle(data[-1], number[1], number[2])
             
             if number[1]:
                 for line in self.map:reverse(line)
